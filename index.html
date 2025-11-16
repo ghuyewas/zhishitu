@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智识图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: sans-serif; }
+        body { background: #fff; padding: 20px; min-height: 100vh; }
+        .container { max-width: 600px; margin: 0 auto; padding: 25px; }
+        .title { font-size: 28px; color: #1a202c; text-align: center; margin-bottom: 25px; }
+        .module-switch { display: flex; gap: 10px; margin-bottom: 20px; }
+        .module-btn { flex: 1; padding: 12px 0; border: none; border-radius: 8px; background: #f8f9fa; color: #343a40; font-size: 15px; cursor: pointer; text-align: center; }
+        .module-btn.active { background: #2563eb; color: #fff; }
+        .submode-switch { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; display: none; }
+        .submode-switch.active { display: flex; }
+        .submode-btn { padding: 7px 14px; border: 1px solid #dee2e6; border-radius: 6px; background: #f8fafc; color: #4a5568; font-size: 13px; cursor: pointer; }
+        .submode-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .action-btns { display: flex; gap: 10px; margin-bottom: 25px; }
+        .action-btn { flex: 1; padding: 12px 0; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; text-align: center; }
+        .upload-btn { background: #2563eb; color: #fff; }
+        .camera-btn { background: #fff; color: #2563eb; border: 1px solid #2563eb; }
+        #cameraPreview { width: 100%; height: 350px; background: #000; border-radius: 10px; display: none; position: relative; }
+        #videoElement { width: 100%; height: 100%; object-fit: cover; }
+        .capture-btn { position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%); padding: 10px 25px; border: none; border-radius: 6px; background: #fff; color: #2563eb; font-size: 15px; cursor: pointer; }
+.close-camera {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    font-size: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    transition: background 0.2s ease;
+    outline: none;
+}
+.close-camera:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+     .preview-box { margin-bottom: 20px; border-radius: 10px; display: none; border: 1px solid #f0f4f9; }
+        #preview-img { width: 100%; height: auto; }
+        .status { height: 22px; color: #4a5568; font-size: 14px; text-align: center; margin: 10px 0; }
+        .result-box { background: #f8fafc; border-radius: 10px; padding: 20px; margin-top: 15px; display: none; border: 1px solid #f0f4f9; }
+        .result-header { font-size: 16px; color: #1a202c; margin-bottom: 10px; }
+        #result-content { color: #2d3748; line-height: 1.7; font-size: 15px; }
+        #fileInput { display: none; }
+        .error { color: #dc2626; }
+        .loading { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(37,99,235,0.3); border-radius: 50%; border-top-color: #2563eb; animation: spin 1s infinite linear; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">智识图</h1>
+        <div class="module-switch">
+            <button class="module-btn active" data-module="text">识文字</button>
+            <button class="module-btn" data-module="world">识天下</button>
+        </div>
+        <div class="submode-switch" id="worldSubmode">
+            <button class="submode-btn active" data-submode="object">物体识别</button>
+            <button class="submode-btn" data-submode="species">物种识别</button>
+            <button class="submode-btn" data-submode="plant">植物识别</button>
+            <button class="submode-btn" data-submode="animal">动物识别</button>
+            <button class="submode-btn" data-submode="food">食物识别</button>
+            <button class="submode-btn" data-submode="brand">品牌识别</button>
+            <button class="submode-btn" data-submode="logo">Logo识别</button>
+        </div>
+        <div class="action-btns">
+            <label class="action-btn upload-btn" for="fileInput">上传图片</label>
+            <button class="action-btn camera-btn" onclick="openCamera()">拍照识别</button>
+            <input type="file" id="fileInput" accept="image/*" onchange="handleUpload(event)">
+        </div>
+        <div id="cameraPreview">
+            <video id="videoElement" autoplay playsinline></video>
+            <button class="capture-btn" onclick="capturePhoto()">拍摄识别</button>
+            <button class="close-camera" onclick="closeCamera()">×</button>
+        </div>
+        <div class="preview-box" id="previewBox">
+            <img id="preview-img" alt="图片预览">
+        </div>
+        <div class="status" id="status">请选择上传图片或拍照识别</div>
+        <div class="result-box" id="resultBox">
+            <div class="result-header">识别结果</div>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = { key: "c00f8dc10f124ec0ac66adcc34958789.0yX3TfMvvXKRLZjy", url: "https://open.bigmodel.cn/api/paas/v4/chat/completions" };
+        const dom = { moduleBtns: document.querySelectorAll('.module-btn'), submodeSwitch: document.getElementById('worldSubmode'), submodeBtns: document.querySelectorAll('.submode-btn'), cameraPreview: document.getElementById('cameraPreview'), video: document.getElementById('videoElement'), previewBox: document.getElementById('previewBox'), previewImg: document.getElementById('preview-img'), status: document.getElementById('status'), resultBox: document.getElementById('resultBox'), resultContent: document.getElementById('result-content') };
+        let currentModule = "text", currentSubmode = "object", mediaStream = null;
+
+        // 切换模块
+        dom.moduleBtns.forEach(btn => btn.addEventListener('click', () => {
+            dom.moduleBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentModule = btn.dataset.module;
+            dom.submodeSwitch.classList.toggle('active', currentModule === 'world');
+            dom.status.textContent = currentModule === 'text' ? "已切换至识文字模式" : "已切换至识天下";
+        }));
+
+        dom.submodeBtns.forEach(btn => btn.addEventListener('click', () => {
+            dom.submodeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentSubmode = btn.dataset.submode;
+            dom.status.textContent = `已切换至${{ object: '物体识别', species: '物种识别', plant: '植物识别', animal: '动物识别', food: '食物识别', brand: '品牌识别', logo: 'Logo识别' }[currentSubmode]}`;
+        }));
+
+        // 图片压缩
+        const compressImage = imgSrc => new Promise(resolve => {
+            const img = new Image();
+            img.src = imgSrc;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > 2000 || h > 2000) { const ratio = Math.min(2000/w, 2000/h); w *= ratio; h *= ratio; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                let quality = 0.9, base64 = canvas.toDataURL('image/png', quality);
+                while (base64.length/1024/1024 > 5 && quality > 0.1) { quality -= 0.1; base64 = canvas.toDataURL('image/png', quality); }
+                resolve(base64);
+            };
+        });
+
+        // 相机操作
+        const openCamera = async () => {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                dom.video.srcObject = mediaStream;
+                dom.cameraPreview.style.display = "block";
+                dom.status.textContent = "相机已打开，点击拍摄";
+            } catch (err) {
+                dom.status.textContent = `相机权限失败：${err.message}`;
+                dom.status.classList.add("error");
+                setTimeout(() => dom.status.classList.remove("error"), 3000);
+            }
+        };
+
+        const closeCamera = () => {
+            mediaStream?.getTracks().forEach(t => t.stop());
+            dom.cameraPreview.style.display = "none";
+            dom.status.textContent = "相机已关闭";
+        };
+
+        // 识别操作
+        const capturePhoto = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = dom.video.videoWidth; canvas.height = dom.video.videoHeight;
+            canvas.getContext('2d').drawImage(dom.video, 0, 0);
+            const base64 = await compressImage(canvas.toDataURL('image/png'));
+            dom.previewImg.src = base64;
+            dom.previewBox.style.display = "block";
+            dom.cameraPreview.style.display = "none";
+            dom.status.innerHTML = '<span class="loading"></span>识别中...';
+            callAPI(base64);
+        };
+
+        const handleUpload = async e => {
+            const reader = new FileReader();
+            reader.onload = async e => {
+                const base64 = await compressImage(e.target.result);
+                dom.previewImg.src = base64;
+                dom.previewBox.style.display = "block";
+                dom.status.innerHTML = '<span class="loading"></span>识别中...';
+                callAPI(base64);
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        // 调用API（指令完整）
+        const callAPI = async base64 => {
+            try {
+                const prompt = currentModule === 'text' 
+                    ? "精准识别图片中所有文字（含倾斜、模糊），逐字输出并补充网络验证的正确表述，不要利用多余符号和空格，表达清楚明确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，准确回答，精确识别，包含所有文字"
+                    : {
+                        object: "精准识别物体，结合网络资源匹配其名称、特征、用途，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想，多结合包装上的内容准确推测，不要极度联想",
+                        species: "识别物种，匹配网络权威数据，说明种类、特征、分布，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想",
+                        plant: "识别植物，匹配网络植物数据库，说明名称、习性、价值，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想",
+                        animal: "识别动物，匹配网络动物图鉴，说明名称、习性、保护级别，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想",
+                        food: "识别食物，匹配网络食材库，说明名称、营养、做法，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想",
+                        brand: "识别品牌，匹配网络品牌库，说明品牌背景、产品，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想",
+                        logo: "识别Logo，匹配网络品牌Logo库，说明对应品牌，标注相似度，不要利用多余符号和空格，表达清楚明确，说出类似可能是什么东西，精确识别但会说可能不准确，长文本和短文本输出的时候，不要任何多余的符号，严格禁止使用###或**-等符号，语言表达明确，不要含糊不清，严禁使用多余符号，请准确表达，请不要使用多余的符号，礼貌用语，参考包装或物体上的内容，以进行准确回答，轻微联想"
+                    }[currentSubmode];
+
+                const res = await fetch(CONFIG.url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CONFIG.key}` },
+                    body: JSON.stringify({
+                        model: "glm-4v-flash",
+                        messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: base64, detail: "high" } }] }],
+                        stream: false, temperature: 0.01
+                    })
+                });
+
+                const data = await res.json();
+                dom.resultContent.textContent = data.error ? `错误：${data.error.message}（码：${data.error.code}）` : data.choices[0]?.message?.content?.trim() || "未识别到有效内容";
+                dom.resultBox.style.display = "block";
+                dom.status.textContent = "识别完成";
+            } catch (err) {
+                dom.status.textContent = `识别失败：${err.message}`;
+                dom.status.classList.add("error");
+                setTimeout(() => dom.status.classList.remove("error"), 3000);
+            }
+        };
+    </script>
+</body>
+</html>
